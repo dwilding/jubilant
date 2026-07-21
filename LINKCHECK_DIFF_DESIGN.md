@@ -124,17 +124,15 @@ Sphinx's own `HyperlinkCollector` then discovers all current URLs during the cur
 
 ```makefile
 linkcheck-collect: install
-	. $(DOCS_VENV) ; $(SPHINX_BUILD) -b linkcheck -q "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) -D linkcheck_diff=collect || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
+	. $(DOCS_VENV) ; $(SPHINX_BUILD) -b linkcheck "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) -D linkcheck_diff=collect || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
 	exit 0
 
 linkcheck-diff: install
-	. $(DOCS_VENV) ; $(SPHINX_BUILD) -b linkcheck -q "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) -D linkcheck_diff=diff || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
+	. $(DOCS_VENV) ; $(SPHINX_BUILD) -b linkcheck "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) -D linkcheck_diff=diff || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
 	exit 0
 ```
 
-`linkcheck-collect` is identical to `linkcheck` but with `-D linkcheck_diff=collect`.
-
-`linkcheck-diff` is identical to `linkcheck` but with `-D linkcheck_diff=diff`. The extension handles the baseline collection internally — no extra Makefile variables or user steps.
+`linkcheck-collect` and `linkcheck-diff` are identical to `linkcheck` but with `-D linkcheck_diff=collect` / `-D linkcheck_diff=diff` respectively, and **without** the `-q` (quiet) flag. The original `linkcheck` target uses `-q` because the full output is noisy (dozens of URLs). For `linkcheck-diff`, the whole point is to see *which* URLs were checked, so `-q` would hide exactly the useful output. For `linkcheck-collect`, seeing the ignored URLs is useful for verifying the baseline. The extension handles the baseline collection internally — no extra Makefile variables or user steps.
 
 ### Interaction with existing `linkcheck_ignore`
 
