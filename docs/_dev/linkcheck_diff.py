@@ -246,7 +246,10 @@ def _collect_baseline(app: Sphinx, repo_root: Path, base_ref: str) -> set[str] |
         worktree_builddir = worktree_dir / '_build'
 
         # Run a collect-mode Sphinx build in the worktree. Reuse the current
-        # venv (same sphinx-build binary and installed packages).
+        # venv (same sphinx-build binary and installed packages). Use -c to
+        # point at the current branch's conf.py so the extension is active
+        # even if the base branch doesn't have it (eliminates the bootstrapping
+        # requirement). The source files come from the worktree (base branch).
         sphinx_build = _find_sphinx_build()
         if sphinx_build is None:
             logger.warning(
@@ -266,6 +269,7 @@ def _collect_baseline(app: Sphinx, repo_root: Path, base_ref: str) -> set[str] |
                 '-b', 'linkcheck',
                 '-q',
                 '-D', 'linkcheck_diff=collect',
+                '-c', str(current_confdir),
                 str(worktree_confdir),
                 str(worktree_builddir),
             ],
