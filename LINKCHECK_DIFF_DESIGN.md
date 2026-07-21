@@ -35,8 +35,10 @@ You just run `make linkcheck-diff`. No branch switching, no stashing, no baselin
 
 A URL is checked if Sphinx discovers it in the current build but it does not appear in the baseline (the base branch's URL set). This catches:
 
-- A brand-new link added to a doc or docstring.
+- A brand-new link added to a doc.
 - An existing link whose URL was changed (the old URL is in the baseline, the new URL is not).
+
+Note: because the baseline build uses the current branch's `conf.py` (see the diff mode handler below), URLs in Python docstrings are read from the current source code in both the baseline and current builds. This means docstring URL changes are **not** caught by the diff — only URLs in doc source files (`*.md`, `*.rst`) are diffed against the base branch. See limitation #4 for details.
 
 ### What is not checked
 
@@ -109,7 +111,7 @@ A single string config value with three states:
 3. Finds the git repo root by running `git rev-parse --show-toplevel` from the Sphinx source directory (`app.confdir`). This avoids assuming `conf.py` is at a fixed depth relative to the repo root.
 4. Reads `github_url` and `repo_default_branch` from `app.builder.config["html_context"]`. Uses `git remote -v` (run from the repo root) to find which remote points at `github_url`, then forms the base ref as `<remote>/<repo_default_branch>`. If no matching remote exists or the ref doesn't resolve, returns early (full-check fallback).
 5. Creates a temporary `git worktree` of the base ref: `git worktree add --detach <temp_dir> <base_ref>`.
-6. Runs a collect-mode Sphinx build in the worktree: `sphinx-build -b linkcheck -D linkcheck_diff=collect <worktree_docs_dir> <worktree_build_dir>`. This discovers all base-branch URLs via Sphinx's `HyperlinkCollector` with no linkcheck HTTP requests. The build reuses the current venv (the same `sphinx-build` binary and installed packages) — the worktree provides source files, the venv provides the Python environment. This assumes dependency compatibility between branches, which is almost always true in practice.
+6. Runs a collect-mode Sphinx build in the worktree: `sphinx-build -b linkcheck -D linkcheck_diff=collect -c <current_confdir> <worktree_docs_dir> <worktree_build_dir>`. The `-c` flag tells Sphinx to use the **current branch's `conf.py`** (which has the extension registered) while reading **source files from the worktree** (the base branch). This is essential: without `-c`, the baseline build would use the worktree's `conf.py`, which may not have the extension registered — in that case the `-D linkcheck_diff=collect` flag would be silently ignored and the baseline build would do a real linkcheck (slow, HTTP requests) instead of a collect. Using `-c` ensures the extension is always active in the baseline build, regardless of whether the base branch has it. The build reuses the current venv (the same `sphinx-build` binary and installed packages) — the worktree provides source files, the venv provides the Python environment. This assumes dependency compatibility between branches, which is almost always true in practice.
 7. Reads the baseline `output.json` from the worktree build dir. Parses the JSONL (one JSON object per line, each with a `uri` field). Extracts the set of URLs.
 8. Cleans up: `git worktree remove --force <temp_dir>`.
 9. For each baseline URL, appends an exact-match pattern (`^<escaped_url>$`) to `app.builder.config["linkcheck_ignore"]`.
@@ -148,9 +150,9 @@ The existing `linkcheck_ignore` entries in `conf.py` are preserved. The extensio
 
 1. **No re-checking of existing links.** A URL that was fine when the baseline was collected but later rots will not be caught by `make linkcheck-diff`. Use `make linkcheck` for a full check.
 2. **Two Sphinx builds in diff mode.** The baseline collection is a full Sphinx build (parsing, autodoc, intersphinx) — not instant. But it makes no linkcheck HTTP requests, so it's much faster than a real linkcheck. The standalone collect mode can be used to cache the baseline in CI.
-3. **Requires the upstream remote.** Diff mode needs a local remote pointing at the upstream repo (discoverable via `github_url`). If the remote doesn't exist (e.g., shallow clone without it), diff mode falls back to a full check.
-4. **Requires the extension in the base branch.** The base branch's `conf.py` must include the extension in its `extensions` list, so that the collect-mode build in the worktree activates the extension. If the base branch predates the extension, the collect flag is ignored and the baseline build does a real linkcheck instead of a collect. This is a bootstrapping requirement: the extension must be added to the base branch first.
-5. **Nested sphinx-build.** Diff mode runs a `sphinx-build` subprocess inside a `builder-inited` handler (which is itself inside a `sphinx-build` process). The baseline build's output should be suppressed or clearly labelled to avoid confusing interleaved output. If the baseline build fails (e.g., broken `conf.py` on the base branch, missing dependencies), the extension should report the failure clearly and fall back to a full check.
+3. **Requires the upstream remote.** Diff mode needs a local remote pointing at the upstream repo (discoverable via `github_url`). If the remote doesn't exist (e.g., shallow clone without it), diff mode falls back to a full check. The remote is discovered by URL, not name — both HTTPS (`https://github.com/owner/repo`) and SSH (`git@github.com:owner/repo`) forms are matched against `github_url`.
+4. **Docstring URL changes not caught.** Because the baseline build uses `-c` to load the current branch's `conf.py` (see step 6 above), autodoc in the baseline build reads docstrings from the **current** source code, not the base branch's. This means a URL added or changed in a Python docstring will appear in both the baseline and the current build, so it will be ignored in the diff. Only URLs in doc source files (`*.md`, `*.rst`) are diffed against the base branch. This is an acceptable trade-off: it eliminates the bootstrapping requirement (the extension does not need to exist in the base branch), and docstring URL changes are rare relative to doc URL changes.
+5. **Nested sphinx-build.** Diff mode runs a `sphinx-build` subprocess inside a `builder-inited` handler (which is itself inside a `sphinx-build` process). The baseline build's output should be suppressed or clearly labelled to avoid confusing interleaved output. If the baseline build fails (e.g., missing dependencies, broken source files on the base branch), the extension should report the failure clearly and fall back to a full check. Note: since the baseline build uses the current branch's `conf.py` (via `-c`), a broken `conf.py` on the base branch is not a failure mode.
 
 ### Testing plan
 
@@ -158,7 +160,7 @@ The existing `linkcheck_ignore` entries in `conf.py` are preserved. The extensio
 2. **Diff mode, no new URLs:** Run `make linkcheck-diff` with no changes since the base branch. Verify no linkcheck HTTP requests are made.
 3. **Diff mode, new URL:** Add a link to a doc, run `make linkcheck-diff`. Verify only the new URL is checked.
 4. **Diff mode, changed URL:** Modify an existing link's URL, run `make linkcheck-diff`. Verify the new URL is checked (the old URL is in the baseline, the new one is not).
-5. **No upstream remote:** Remove the upstream remote, verify `make linkcheck-diff` falls back to full check.
+5. **No upstream remote:** Remove the upstream remote entirely (not just rename it — the extension discovers the remote by URL, not name), verify `make linkcheck-diff` falls back to full check.
 6. **`make linkcheck` unchanged:** Verify `make linkcheck` still checks all links and is unaffected by the extension.
 7. **`make html` unaffected:** Verify the extension is dormant during HTML builds.
 8. **Existing `linkcheck_ignore` preserved:** Verify user-configured ignores are still respected in both collect and diff modes.
@@ -200,3 +202,11 @@ The Makefile targets (`linkcheck-collect`, `linkcheck-diff`) are added to the ex
 | **Scope** | Validated against Jubilant's docs only. | Tested across multiple project structures, markup formats, and extension combinations. |
 
 The PoC validates the core mechanism — the `builder-inited` handler, collect/diff modes, worktree-based baseline collection, and `linkcheck_ignore` manipulation — using Jubilant's actual docs. The extension code itself is identical in both; only the packaging and loading mechanism differ.
+
+### PoC validation results
+
+All 9 tests from the testing plan pass. Key findings from the PoC:
+
+- **The `-c` flag is essential.** Without it, the baseline build uses the worktree's `conf.py`, which doesn't have the extension registered. The `-D linkcheck_diff=collect` flag is then silently ignored, and the baseline build does a real linkcheck (slow, HTTP requests) instead of a collect. Using `-c <current_confdir>` ensures the extension is always active in the baseline build. This eliminates the original bootstrapping requirement (the extension does not need to exist in the base branch first).
+- **Remote discovery matches on URL, not name.** The extension finds the upstream remote by matching its fetch/push URL against `github_url` from `html_context`. Both HTTPS (`https://github.com/owner/repo`) and SSH (`git@github.com:owner/repo`) remote URLs are matched. This means renaming a remote does not affect discovery — only removing it (or changing its URL) triggers the fallback.
+- **`Config.__getitem__` returns the live list.** Sphinx's `Config.__getitem__` returns `getattr(self, name)`, so `app.builder.config['linkcheck_ignore']` returns the actual list object. Appending to it in the `builder-inited` handler modifies the config in place, and `HyperlinkAvailabilityChecker` (which compiles the patterns later, in `finish()`) picks up the appended entries. This is why the extension only needs a `builder-inited` handler — no `build-finished` or other hooks.
