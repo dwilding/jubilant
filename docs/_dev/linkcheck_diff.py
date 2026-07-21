@@ -199,7 +199,7 @@ def _urls_match(remote_url: str, github_url: str) -> bool:
     if remote_url.endswith('.git'):
         remote_url = remote_url[:-4]
 
-    return remote_url == https_form or remote_url == ssh_form
+    return remote_url in (https_form, ssh_form)
 
 
 def _collect_baseline(app: Sphinx, repo_root: Path, base_ref: str) -> set[str] | None:

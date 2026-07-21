@@ -9,7 +9,7 @@ reference/index
 explanation/index
 ```
 
-Jubilant is a Python library that wraps the [Juju](https://canonical.com/juju) CLI, primarily for use in charm integration tests.
+Jubilant is a Python library that wraps the [Juju](https://canonical.com/juju) CLI, primarily for use in charm integration tests. It requires [Python 3.10 or above](https://docs.python.org/3/).
 
 When writing charm integration tests, use Jubilant with `pytest-jubilant`. See {external+operator:ref}`How to write integration tests for a charm <write-integration-tests-for-a-charm>` in the Ops documentation. Ops also has several [demo charms](https://github.com/canonical/operator/tree/main/examples) that you can experiment with. The demo charms use Jubilant in their integration tests.
 
@@ -28,7 +28,7 @@ You should switch to Jubilant if your integration tests currently use [pytest-op
 - [Design goals](explanation/design-goals)
 - [API reference](reference/jubilant)
 
-This documentation uses the [Diátaxis documentation structure](https://diataxis.fr/).
+This documentation uses the [Diátaxis documentation structure](https://www.diataxis.fr/).
 
 ## Releases
 
