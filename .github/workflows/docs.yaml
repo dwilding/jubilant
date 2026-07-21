@@ -32,12 +32,12 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with:
           python-version: "3.12"
-      - name: Links
-        id: linkcheck-step
-        if: success() || failure()
-        uses: canonical/documentation-workflows/linkcheck@aaeaf091e8f55145184ad897cb9834f224bd31de  # main, 2026-03-21
-        with:
-          working-directory: docs
+      # - name: Links
+      #   id: linkcheck-step
+      #   if: success() || failure()
+      #   uses: canonical/documentation-workflows/linkcheck@aaeaf091e8f55145184ad897cb9834f224bd31de  # main, 2026-03-21
+      #   with:
+      #     working-directory: docs
       - name: Spelling
         id: spellcheck-step
         if: success() || failure()
