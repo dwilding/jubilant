@@ -157,10 +157,24 @@ To adopt it in a project:
 2. **The first diff for a base SHA is slow.** Collection is a venv install plus a full Sphinx build. Subsequent diffs reuse the cache.
 3. **Requires an upstream remote and one successful fetch.** Without a remote matching `github_url`, or before the first fetch, the base SHA can't be resolved and the command errors. Here "upstream" means the repo the docs describe, discovered via `github_url` — which may be your fork.
 
-## Future work
+## CI caching
 
-- **Cache eviction.** The cache keeps one file per base SHA forever. Prune to the newest N entries plus the current SHA.
-- **CI caching.** Cache `docs/_dev/.linkcheck-diff/` in CI, keyed on the base SHA, so PR checks skip collection entirely.
+PR checks must not pay the baseline cost on every run. The cache directory holds one small JSON file per base SHA, and `ensure-baseline` re-resolves the base SHA and validates the file name on every run. That makes cache entries self-validating: a stale entry is ignored (a miss, then recollection), never used wrongly. No invalidation logic is needed anywhere.
+
+The workflow adds one step before `make linkcheck-diff`:
+
+```yaml
+- uses: actions/cache@v4
+  with:
+    path: docs/_dev/.linkcheck-diff
+    key: linkcheck-diff-${{ github.run_id }}
+    restore-keys: |
+      linkcheck-diff-
+```
+
+The key can't contain the base SHA, because the SHA isn't known until the run fetches. It doesn't need to be exact: `restore-keys` restores the branch's most recent cache directory, and `ensure-baseline` picks the `<sha>.json` file matching the current base out of it. A moved base means the file isn't there — a miss, a recollection, and the post-step saves the updated directory.
+
+Each PR populates its own cache. The first run of a PR collects; re-runs and pushes to the branch reuse the baseline for as long as the base SHA stays put. Runs on `main` reuse the same workflow unchanged: the SHA has just changed, so the restore is a miss and the run collects, which does no harm.
 
 ## Testing plan
 
