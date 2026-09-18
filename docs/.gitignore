@@ -6,6 +6,7 @@
 _dev/warnings.txt
 _dev/.wordlist.dic
 _dev/.doctrees/
+_dev/.linkcheck-diff/
 _dev/update/
 _dev/node_modules/
 

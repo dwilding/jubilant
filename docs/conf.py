@@ -8,10 +8,6 @@ import textwrap
 # [BEYOND SPHINX STACK] Make sure that sphinx.ext.autodoc can find our Python source files.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
-# [BEYOND SPHINX STACK] Load the linkcheck-diff extension from docs/_dev.
-# See LINKCHECK_DIFF_DESIGN.md for details.
-sys.path.insert(0, str(pathlib.Path(__file__).parent / "_dev"))
-
 
 # Configuration for the Sphinx documentation builder.
 # All configuration specific to your project should be done in this file.
@@ -83,7 +79,7 @@ html_context = {
     # documentation source files and creating GitHub issues are added at the bottom of
     # each page.
     # TODO: Change to your documentation GitHub repository URL or leave empty.
-    "github_url": "https://github.com/canonical/jubilant",
+    "github_url": "https://github.com/dwilding/jubilant",
     # Docs branch in the repo; used in links for viewing the source files
     "repo_default_branch": "main",
     # Docs location in the repo; used in links for viewing the source files
@@ -248,8 +244,7 @@ extensions = [
     "sphinx_sitemap",
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
-    # [BEYOND SPHINX STACK] Restricted link checker (see LINKCHECK_DIFF_DESIGN.md).
-    "linkcheck_diff",
+    "sphinx_linkcheck_diff",
 ]
 
 # Excludes files or directories from processing

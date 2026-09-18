@@ -29,6 +29,10 @@ sphinx-last-updated-by-git~=0.3
 sphinx-sitemap~=2.9
 sphinx-llm~=0.4
 
+# Restricted link checker (see LINKCHECK_DIFF_DESIGN_2.md).
+# TODO: publish to PyPI and pin a version here instead of the local path.
+sphinx-linkcheck-diff @ file://../sphinx-linkcheck-diff
+
 # Vale dependencies
 rst2html
 vale~=3.13

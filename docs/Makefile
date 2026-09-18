@@ -34,7 +34,6 @@ help:
 	@echo "* clean full environment:                    make clean"
 	@echo "* check links:                               make linkcheck"
 	@echo "* check only new/changed links:              make linkcheck-diff"
-	@echo "* collect all links (no HTTP):               make linkcheck-collect"
 	@echo "* check markdown:                            make lint-md"
 	@echo "* check spelling:                            make spelling"
 	@echo "* check spelling (without building again):   make spellcheck"
@@ -46,7 +45,7 @@ help:
 	@echo "-------------------------------------------------------------"
 	@echo
 
-.PHONY: help full-help html epub pdf linkcheck linkcheck-diff linkcheck-collect spelling spellcheck woke \
+.PHONY: help full-help html epub pdf linkcheck linkcheck-diff spelling spellcheck woke \
         vale pa11y run serve install pa11y-install   \
         vale-install pdf-prep pdf-prep-force clean clean-doc \
         update lint-md
@@ -108,17 +107,14 @@ linkcheck: install
 	. $(DOCS_VENV) ; $(SPHINX_BUILD) -b linkcheck -q "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
 	exit 0
 
-# Collect all URLs into a baseline output.json with no linkcheck HTTP requests.
-# Useful for CI caching. See LINKCHECK_DIFF_DESIGN.md.
-linkcheck-collect: install
-	. $(DOCS_VENV) ; $(SPHINX_BUILD) -b linkcheck "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) -D linkcheck_diff=collect || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
-	exit 0
-
 # Check only URLs that are new or changed relative to the base branch.
-# See LINKCHECK_DIFF_DESIGN.md.
+# See LINKCHECK_DIFF_DESIGN_2.md.
 linkcheck-diff: install
-	. $(DOCS_VENV) ; $(SPHINX_BUILD) -b linkcheck "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) -D linkcheck_diff=diff || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
-	exit 0
+	@mkdir -p "$(DEV_DIR)/.linkcheck-diff"; \
+	if ! $(DOCS_VENVDIR)/bin/sphinx-linkcheck-diff ensure-baseline > "$(DEV_DIR)/.linkcheck-diff/baseline.path"; then \
+	    cat "$(DEV_DIR)/.linkcheck-diff/baseline.path"; exit 1; \
+	fi; \
+	. $(DOCS_VENV); $(SPHINX_BUILD) -b linkcheck "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) -D linkcheck_diff_baseline="$(DEV_DIR)/.linkcheck-diff/baseline.path" || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
 
 pa11y: pa11y-install html
 	find $(DOCS_BUILDDIR) -name *.html -print0 | xargs -n 1 -0 $(PA11Y_CMD)
