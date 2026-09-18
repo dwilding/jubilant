@@ -22,7 +22,7 @@ The make target runs two phases in sequence:
 1. **Ensure baseline.** The collector CLI resolves the head SHA of the base branch and makes sure a cached baseline exists for that SHA. The first run for a SHA performs an isolated build of the base branch to collect its URLs. Subsequent runs reuse the cache. The CLI prints the path of the baseline file.
 2. **Run the linkcheck build.** A normal `sphinx-build -b linkcheck` run, plus `-D linkcheck_diff_baseline=<path>`. The extension adds every baseline URL to `linkcheck_ignore`, so only URLs outside the baseline are checked.
 
-If there are no new URLs, the command completes without any linkcheck HTTP requests. Sphinx still parses the docs and resolves intersphinx before the linkcheck phase, so the command is never instant.
+If there are no new URLs, the command makes no linkcheck HTTP requests. Sphinx still parses the docs and resolves intersphinx before the linkcheck phase runs.
 
 ### What "new or changed" means
 
@@ -35,8 +35,8 @@ The baseline build runs the base branch's own `conf.py` and source code in an is
 
 ### What is not checked
 
-- **Unchanged URLs** — those in the baseline. Upstream CI or a prior `make linkcheck` run has verified them.
-- **Intersphinx links** — these are resolved at build time from remote inventory files. Bad intersphinx references fail the normal Sphinx build, so linkcheck doesn't need to cover them. Both builds discover them the same way, so they appear in the baseline and are ignored in the diff.
+- **Unchanged URLs** — those in the baseline. They exist on the base branch, so they are not new.
+- **Intersphinx links** — these are resolved at build time from remote inventory files, and the resolved URLs are discovered like any other URL, so they appear in the baseline and are ignored in the diff. An unresolvable intersphinx reference is a Sphinx warning, not a linkcheck result.
 
 ### Failure behavior
 
@@ -155,7 +155,7 @@ To adopt it in a project:
 
 1. **No re-checking existing links.** A URL that was fine when the baseline was collected but later rots is not caught. Use `make linkcheck` for a full check.
 2. **The first diff for a base SHA is slow.** Collection is a venv install plus a full Sphinx build. Subsequent diffs reuse the cache.
-3. **Requires an upstream remote and one successful fetch.** Without a remote matching `github_url`, or before the first fetch, the base SHA can't be resolved and the command errors.
+3. **Requires an upstream remote and one successful fetch.** Without a remote matching `github_url`, or before the first fetch, the base SHA can't be resolved and the command errors. Here "upstream" means the repo the docs describe, discovered via `github_url` — which may be your fork.
 
 ## Future work
 
