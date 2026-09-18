@@ -31,7 +31,7 @@ sphinx-llm~=0.4
 
 # Restricted link checker (see LINKCHECK_DIFF_DESIGN_2.md).
 # TODO: publish to PyPI and pin a version here instead of the local path.
-sphinx-linkcheck-diff @ file://../sphinx-linkcheck-diff
+../sphinx-linkcheck-diff
 
 # Vale dependencies
 rst2html

@@ -110,11 +110,8 @@ linkcheck: install
 # Check only URLs that are new or changed relative to the base branch.
 # See LINKCHECK_DIFF_DESIGN_2.md.
 linkcheck-diff: install
-	@mkdir -p "$(DEV_DIR)/.linkcheck-diff"; \
-	if ! $(DOCS_VENVDIR)/bin/sphinx-linkcheck-diff ensure-baseline > "$(DEV_DIR)/.linkcheck-diff/baseline.path"; then \
-	    cat "$(DEV_DIR)/.linkcheck-diff/baseline.path"; exit 1; \
-	fi; \
-	. $(DOCS_VENV); $(SPHINX_BUILD) -b linkcheck "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) -D linkcheck_diff_baseline="$(DEV_DIR)/.linkcheck-diff/baseline.path" || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
+	@BASELINE=$$($(DOCS_VENVDIR)/bin/sphinx-linkcheck-diff ensure-baseline) || exit 1; \
+	. $(DOCS_VENV); $(SPHINX_BUILD) -b linkcheck "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) -D linkcheck_diff_baseline="$$BASELINE" || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
 
 pa11y: pa11y-install html
 	find $(DOCS_BUILDDIR) -name *.html -print0 | xargs -n 1 -0 $(PA11Y_CMD)

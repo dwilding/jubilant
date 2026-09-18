@@ -135,19 +135,11 @@ Appending in `builder-inited` is sufficient: `Config.__getitem__` returns the li
 
 ```makefile
 linkcheck-diff: install
-	@mkdir -p "$(DEV_DIR)/.linkcheck-diff"; \
-	if ! $(DOCS_VENVDIR)/bin/sphinx-linkcheck-diff ensure-baseline > "$(DEV_DIR)/.linkcheck-diff/baseline.path"; then \
-	    cat "$(DEV_DIR)/.linkcheck-diff/baseline.path"; exit 1; \
-	fi; \
-	. $(DOCS_VENV); $(SPHINX_BUILD) -b linkcheck "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) -D linkcheck_diff_baseline="$(DEV_DIR)/.linkcheck-diff/baseline.path" || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
+	@BASELINE=$$($(DOCS_VENVDIR)/bin/sphinx-linkcheck-diff ensure-baseline) || exit 1; \
+	. $(DOCS_VENV); $(SPHINX_BUILD) -b linkcheck "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) -D linkcheck_diff_baseline="$$BASELINE" || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
 ```
 
-The target differs from `linkcheck` only in the ensure-baseline step and the `-D` flag. It does not pass `-q`: the per-URL output is the point of the command.
-
-Two details the recipe handles:
-
-- **Failure propagation.** If `ensure-baseline` fails, the recipe prints its output and exits nonzero. A plain command substitution would swallow the failure and leave the variable empty.
-- **The path is captured in a file, not a variable.** The CLI prints the baseline path to stdout and warnings to stderr, so warnings reach the terminal and only the path lands in the file. Make would otherwise expand a shell variable into the `-D` argument one recipe line at a time, and any stderr text would end up inside it.
+The target differs from `linkcheck` only in the ensure-baseline step and the `-D` flag. It does not pass `-q`: the per-URL output is the point of the command. The recipe is one shell invocation (the backslashes continue the line), so `$$BASELINE` carries the collector's stdout — the baseline path — into the `-D` argument, and `|| exit 1` propagates a collector failure instead of running a full check.
 
 ## Implementation and packaging
 
