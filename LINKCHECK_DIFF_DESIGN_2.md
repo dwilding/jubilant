@@ -65,7 +65,7 @@ Principles behind the split:
 
 ## Baseline collector
 
-The CLI has one command, `ensure-baseline`, run from the docs directory. It prints the path of a cached baseline for the current base head SHA, collecting one first if needed. It resolves the docs directory and cache location from its working directory, so no arguments are required in the standard setup.
+The CLI has one command, `ensure-baseline`, run from the docs directory. It prints the path of a cached baseline for the current base head SHA, collecting one first if needed. It resolves the docs directory and cache location from its working directory, so no arguments are required in the standard setup. An optional `--docs-dir` overrides the working directory, for tests.
 
 1. Read `github_url` and `repo_default_branch` from `html_context` in the docs `conf.py`. The collector executes `conf.py` in a fresh namespace to get them — the same file Sphinx executes on every build.
 2. Find the remote: run `git remote -v` from the repo root and match remote URLs against `github_url`. Both HTTPS (`https://github.com/owner/repo`) and SSH (`git@github.com:owner/repo`) forms are matched, so no remote name is assumed.
@@ -110,7 +110,7 @@ Each baseline records its own SHA and collection time:
 }
 ```
 
-The SHA makes every entry self-describing: the file name, the `base_sha` field, and the base branch state always agree.
+The SHA makes every entry self-describing: the file name, the `base_sha` field, and the base branch state always agree. The URIs are sorted, so rewriting a baseline for the same SHA always produces the same bytes.
 
 ## Sphinx extension (baseline filter)
 
@@ -124,7 +124,7 @@ The `builder-inited` handler:
 
 1. If the builder is not `CheckExternalLinksBuilder`, return.
 2. If `linkcheck_diff_baseline` is empty, return. The extension is dormant, so `make linkcheck` and `make html` are unaffected.
-3. Load the baseline JSON. If the path doesn't exist or the file is invalid, fail the build with an error naming the path. The make target guarantees a valid baseline before invoking Sphinx; this check catches hand-written invocations.
+3. Load the baseline JSON. If the path doesn't exist, the file isn't valid JSON, or the JSON lacks a `uris` list, fail the build with an error naming the path. The make target guarantees a valid baseline before invoking Sphinx; this check catches hand-written invocations.
 4. Append `^<re.escape(uri)>$` to `linkcheck_ignore` for each URI in the baseline.
 
 Existing `linkcheck_ignore` entries in `conf.py` are preserved — the extension appends, never replaces.
@@ -154,7 +154,7 @@ To adopt it in a project:
 ## Known limitations
 
 1. **No re-checking existing links.** A URL that was fine when the baseline was collected but later rots is not caught. Use `make linkcheck` for a full check.
-2. **The first diff for a base SHA is slow.** Collection is a venv install plus a full Sphinx build (timings under "Isolated baseline collection"). Subsequent diffs reuse the cache.
+2. **The first diff for a base SHA is slow.** Collection is a venv install plus a full Sphinx build. Subsequent diffs reuse the cache.
 3. **Requires an upstream remote and one successful fetch.** Without a remote matching `github_url`, or before the first fetch, the base SHA can't be resolved and the command errors.
 
 ## Future work
@@ -164,28 +164,34 @@ To adopt it in a project:
 
 ## Testing plan
 
-The package ships a test suite with two kinds of tests: unit tests for the extension, and integration tests for the collector and the end-to-end flow. The integration tests use a fixture repository with a known base branch, so they don't depend on any real remote.
+The package ships a pytest suite with unit tests for the extension and integration tests for the collector and the end-to-end flow. The integration tests use a fixture repository with a known base branch, so they don't depend on any real remote. Two fixture details make this work:
+
+- **The fixture docs use reST.** The isolated baseline build installs only what the fixture `requirements.txt` lists, and the fixture installs just this package — so the baseline venv has stock Sphinx, which doesn't parse Markdown.
+- **The fixture remote is a local bare repository, and the fixture's `github_url` is its path.** The collector's URL matching must normalize the `.git` suffix on both sides for this to resolve.
+
+The fixture URIs point at example.com paths that don't exist, so a checked URI ends up `broken`. That distinguishes "checked" from "ignored" without needing a link that responds; the build's exit code is irrelevant.
 
 **Extension (unit tests):**
 
-1. Set `linkcheck_diff_baseline` to a fixture file and run a linkcheck build. Every fixture URI is ignored, all others are checked, and the project's own `linkcheck_ignore` entries still apply.
-2. Point `linkcheck_diff_baseline` at a missing file. The build fails with an error naming the path.
-3. Run an HTML build and a plain linkcheck build with `linkcheck_diff_baseline` unset. Both behave exactly as they would without the extension.
-4. Run an HTML build, then a linkcheck build with the baseline set, then an HTML build again. The doctree cache is reused throughout — the changing `linkcheck_diff_baseline` value doesn't force a re-parse.
+1. Set `linkcheck_diff_baseline` to a fixture file and run a linkcheck build. Every fixture URI is ignored, all others are checked.
+2. A URI matching the project's own `linkcheck_ignore` stays ignored alongside the baseline.
+3. Point `linkcheck_diff_baseline` at a missing file. The build fails with an error naming the path.
+4. Point it at a file that isn't valid JSON, and at one without a `uris` list. Both fail the build.
+5. With `linkcheck_diff_baseline` unset, no URI is ignored.
 
 **Collector (integration tests, against the fixture repository):**
 
-5. Run `ensure-baseline` against a known base SHA and compare the URI set against a fixture.
-6. Run it twice. The second run makes no worktree and no venv, and completes in under a second.
-7. Point the remote at an unreachable URL. The run warns, resolves the last-fetched SHA, and succeeds from cache.
-8. Configure `github_url` with no matching local remote. The command errors.
-9. Collect from a base branch that contains a deliberately broken link. Collection succeeds and the URI set is complete.
-10. After collection, no worktree remains (`git worktree list`) and the temp directory is gone.
+6. `ensure-baseline` collects the base branch's URI set.
+7. A second run returns the same path without recollecting.
+8. The baseline records the base SHA (matching `git rev-parse origin/main`) and a collection time.
+9. A `github_url` with no matching local remote errors.
+10. An unreachable remote (the fetch fails fast) prints a warning and collects from the last-fetched head.
+11. The console script prints the baseline path and exits zero.
+12. After collection, no worktree remains (`git worktree list`).
+13. Collecting after edits to the working-tree docs still yields the base branch's URI set — the baseline reflects the base, not the working tree.
 
 **End to end (integration tests, against the fixture repository):**
 
-11. With no doc changes since the base branch, `make linkcheck-diff` makes no linkcheck HTTP requests.
-12. Add a new URL to a doc and change an existing one. Only those two URLs are checked.
-13. Change a URL inside a Python docstring. That URL is checked.
-14. Make `ensure-baseline` fail (remove the remote), then run `make linkcheck-diff`. The make target exits nonzero with the collector's error — it never falls through to a full check.
-15. Run `make clean-doc`, then `make linkcheck-diff`. The cached baseline is reused; nothing is recollected.
+14. With no doc changes since the base branch, every URI is ignored.
+15. A URL added on the branch is checked; base URLs stay ignored.
+16. A base branch with a broken link still produces a complete baseline.
