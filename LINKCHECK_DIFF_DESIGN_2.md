@@ -159,7 +159,7 @@ To adopt it in a project:
 
 ## CI caching
 
-PR checks must not pay the baseline cost on every run. The cache directory holds one small JSON file per base SHA, and `ensure-baseline` re-resolves the base SHA and validates the file name on every run. That makes cache entries self-validating: a stale entry is ignored (a miss, then recollection), never used wrongly. No invalidation logic is needed anywhere.
+PR checks must not pay the baseline cost on every run. The cache directory holds one small JSON file per base SHA, and `ensure-baseline` re-resolves the base SHA and validates the file name on every run. A stale entry is a miss followed by recollection, never a wrong baseline. No invalidation logic is needed.
 
 The workflow adds one step before `make linkcheck-diff`:
 
@@ -172,9 +172,9 @@ The workflow adds one step before `make linkcheck-diff`:
       linkcheck-diff-
 ```
 
-The key can't contain the base SHA, because the SHA isn't known until the run fetches. It doesn't need to be exact: `restore-keys` restores the branch's most recent cache directory, and `ensure-baseline` picks the `<sha>.json` file matching the current base out of it. A moved base means the file isn't there — a miss, a recollection, and the post-step saves the updated directory.
+The key can't contain the base SHA, because the SHA isn't known until the run fetches. It doesn't need to be exact: `restore-keys` restores the branch's most recent cache directory, and `ensure-baseline` picks the `<sha>.json` file matching the current base out of it. If the base has moved, the file isn't there, so the run recollects and the post-step saves the updated directory.
 
-Each PR populates its own cache. The first run of a PR collects; re-runs and pushes to the branch reuse the baseline for as long as the base SHA stays put. Runs on `main` reuse the same workflow unchanged: the SHA has just changed, so the restore is a miss and the run collects, which does no harm.
+Each PR populates its own cache. The first run of a PR collects; re-runs and pushes to the branch reuse the baseline for as long as the base SHA stays put. Runs on `main` reuse the same workflow unchanged: the SHA has just changed, so the restore misses and the run collects.
 
 ## Testing plan
 
