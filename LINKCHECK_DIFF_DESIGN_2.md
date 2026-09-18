@@ -31,7 +31,7 @@ A URL is checked if the current build discovers it and the baseline does not con
 - A brand-new link added to a doc or a Python docstring.
 - An existing link whose URL was changed. The old URL is in the baseline, the new one is not.
 
-The baseline build runs the base branch's own `conf.py` and source code in an isolated environment, so URLs in docstrings are diffed the same as URLs in doc files.
+The baseline build runs the base branch's own `conf.py` and source code in an isolated environment, so it discovers docstring URLs as they are on the base branch. Docstring URL changes are diffed the same as doc URL changes.
 
 ### What is not checked
 
@@ -40,7 +40,7 @@ The baseline build runs the base branch's own `conf.py` and source code in an is
 
 ### Failure behavior
 
-If a step fails, `make linkcheck-diff` fails with a clear error. It never silently degrades to a full check.
+If a step fails, `make linkcheck-diff` fails with a clear error. It never silently falls back to a full check.
 
 - **The fetch fails** (for example, you are offline): the collector prints a warning and continues with the SHA from the last successful fetch. A baseline cached for that SHA is still used.
 - **The base branch cannot be resolved** (no remote matches `github_url`, or the ref was never fetched): the collector errors out.
@@ -80,13 +80,13 @@ The collection build is isolated from both your working tree and the current ven
 
 1. Create a temporary `git worktree` of the base head SHA. Your working tree is not touched.
 2. Create a fresh venv and install the worktree's own `docs/requirements.txt` into it.
-3. Run a collect build with stock Sphinx — nothing needs to be installed or configured on the base branch for this:
+3. Run a collect build with stock Sphinx — the base branch needs nothing installed or configured:
 
    ```
    sphinx-build -b linkcheck -D linkcheck_ignore=.* <worktree docs dir> <temp build dir>
    ```
 
-   `linkcheck_ignore` takes regex patterns, and `.*` matches every URL. Sphinx's `HyperlinkCollector` still discovers every URL and writes `output.json`, but the checker reports all of them as `ignored`, so the build makes no linkcheck HTTP requests. The `-D` override replaces the base branch's own `linkcheck_ignore`, which is harmless because `.*` matches everything.
+   `linkcheck_ignore` takes regex patterns, and `.*` matches every URL, so the checker reports every URL as `ignored` and the build makes no linkcheck HTTP requests. The override replaces the base branch's own `linkcheck_ignore`, which `.*` makes harmless. Sphinx's `HyperlinkCollector` still discovers every URL and writes `output.json`.
 4. Parse `output.json` (JSONL, one object per line) and extract the `uri` fields.
 5. Remove the worktree, the venv, and the build directory.
 
@@ -98,7 +98,7 @@ The success criterion is `output.json` existing, not the exit code. Sphinx write
 
 Baselines live at `docs/_dev/.linkcheck-diff/baselines/<sha>.json`, one file per base SHA. The `_dev` directory already holds regenerable build caches such as `.doctrees`, and this follows that convention. Add `_dev/.linkcheck-diff/` to `docs/.gitignore`.
 
-Neither `make clean-doc` nor `make clean` removes the directory. Deleting the directory by hand is always safe — the next diff recollects.
+Neither `make clean-doc` nor `make clean` removes the directory. Deleting it by hand is always safe — the next diff recollects.
 
 Each baseline records its own SHA and collection time:
 
@@ -118,7 +118,7 @@ The SHA makes every entry self-describing: the file name, the `base_sha` field, 
 app.add_config_value("linkcheck_diff_baseline", "", "linkcheck", (str,))
 ```
 
-The rebuild domain is `linkcheck`, not `env`. Sphinx re-reads every doctree when an `env`-domain value changes, and this value alternates between empty (`make html`) and a path (`make linkcheck-diff`) — an `env` domain would force a full re-parse on each switch between the two commands. A `linkcheck`-domain change leaves the doctree cache untouched.
+The rebuild domain is `linkcheck`, not `env`. Sphinx re-reads every doctree when an `env`-domain value changes, and this value alternates between empty (`make html`) and a path (`make linkcheck-diff`). An `env` domain would force a full re-parse on each switch between the two commands.
 
 The `builder-inited` handler:
 
@@ -169,7 +169,7 @@ The package ships a pytest suite with unit tests for the extension and integrati
 - **The fixture docs use reST.** The isolated baseline build installs only what the fixture `requirements.txt` lists, and the fixture installs just this package — so the baseline venv has stock Sphinx, which doesn't parse Markdown.
 - **The fixture remote is a local bare repository, and the fixture's `github_url` is its path.** The collector's URL matching must normalize the `.git` suffix on both sides for this to resolve.
 
-The fixture URIs point at example.com paths that don't exist, so a checked URI ends up `broken`. That distinguishes "checked" from "ignored" without needing a link that responds; the build's exit code is irrelevant.
+The fixture URIs point at example.com paths that don't exist, so a checked URI ends up `broken`. That distinguishes "checked" from "ignored" without needing a link that responds.
 
 **Extension (unit tests):**
 
