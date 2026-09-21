@@ -92,6 +92,8 @@ The collection build is isolated from both your working tree and the current ven
 
 The venv install dominates the collection time. The Sphinx build itself is a small fraction of it.
 
+Adoption is one-sided: the extension and the collector run on your branch only, so `make linkcheck-diff` works against any base branch, including one that predates the tool. The base branch only needs a docs tree that builds.
+
 The success criterion is `output.json` existing, not the exit code. Sphinx writes all results to `output.json` before setting its failure exit code, so a base branch with broken links still produces a complete URL set. Harder failures (a bad `conf.py`, missing dependencies) produce no `output.json` at all, and the collector crashes with the build's error output.
 
 ## Baseline cache
