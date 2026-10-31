@@ -8,6 +8,7 @@ _dev/.wordlist.dic
 _dev/.doctrees/
 _dev/update/
 _dev/node_modules/
+_dev/.linkcheck-diff/
 
 # Vale
 _dev/styles/*

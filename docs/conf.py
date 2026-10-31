@@ -221,6 +221,7 @@ linkcheck_retries = 3
 # Custom Sphinx extensions; see
 # https://www.sphinx-doc.org/en/master/usage/extensions/index.html
 extensions = [
+    "sphinx_linkcheck_diff",  # linkcheck-diff baseline filter
     "canonical_sphinx",
     "notfound.extension",
     "sphinx_design",

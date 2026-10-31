@@ -33,6 +33,7 @@ help:
 	@echo "* clean built doc files:                     make clean-doc"
 	@echo "* clean full environment:                    make clean"
 	@echo "* check links:                               make linkcheck"
+	@echo "* check links changed vs base branch:        make linkcheck-diff"
 	@echo "* check markdown:                            make lint-md"
 	@echo "* check spelling:                            make spelling"
 	@echo "* check spelling (without building again):   make spellcheck"
@@ -44,7 +45,7 @@ help:
 	@echo "-------------------------------------------------------------"
 	@echo
 
-.PHONY: help full-help html epub pdf linkcheck spelling spellcheck woke \
+.PHONY: help full-help html epub pdf linkcheck linkcheck-diff spelling spellcheck woke \
         vale pa11y run serve install pa11y-install   \
         vale-install pdf-prep pdf-prep-force clean clean-doc \
         update lint-md
@@ -101,10 +102,19 @@ clean: clean-doc
 clean-doc:
 	git clean -fx "$(DOCS_BUILDDIR)"
 	rm -rf $(DEV_DIR)/.doctrees
+	rm -rf $(DEV_DIR)/.linkcheck-diff
 
 linkcheck: install
 	. $(DOCS_VENV) ; $(SPHINX_BUILD) -b linkcheck -q "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
 	exit 0
+
+# Check only URLs that are new or changed relative to the base branch
+# (BASE_BRANCH, or repo_default_branch when unset). A baseline is collected
+# from the base branch automatically on first use and cached per base SHA.
+linkcheck-diff: install
+	@export BASE_BRANCH; \
+	BASELINE=$$(. $(DOCS_VENV); python3 -m sphinx_linkcheck_diff '$(SPHINX_OPTS)') || exit 1; \
+	. $(DOCS_VENV); $(SPHINX_BUILD) -b linkcheck "$(DOCS_SOURCEDIR)" "$(DOCS_BUILDDIR)" $(SPHINX_OPTS) -D linkcheck_diff_baseline="$$BASELINE" || { grep --color -F "[broken]" "$(DOCS_BUILDDIR)/output.txt"; exit 1; }
 
 pa11y: pa11y-install html
 	find $(DOCS_BUILDDIR) -name *.html -print0 | xargs -n 1 -0 $(PA11Y_CMD)
