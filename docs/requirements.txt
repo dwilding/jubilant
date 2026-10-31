@@ -24,6 +24,7 @@ sphinx-youtube-links~=0.1
 
 # Other dependencies
 packaging~=26.1
+sphinx-linkcheck-diff @ git+https://github.com/canonical/sphinx-linkcheck-diff@d6d0233442abca25649611c8e63d1721af73ebae
 sphinxcontrib-svg2pdfconverter[CairoSVG]~=2.1
 sphinx-last-updated-by-git~=0.3
 sphinx-sitemap~=2.9
